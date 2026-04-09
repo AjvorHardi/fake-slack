@@ -17,6 +17,13 @@ export type Message = {
   created_at: string
 }
 
+export type OnlineUser = {
+  clientId: string
+  nickname: string
+  onlineAt: string
+  isCurrentUser: boolean
+}
+
 export type CreateRoomInput = {
   name: string
   description: string | null

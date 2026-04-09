@@ -17,8 +17,14 @@ import {
   setNickname,
   setTheme,
 } from './lib/storage.ts'
-import type { CreateRoomInput, Message, Room } from './types.ts'
+import type { CreateRoomInput, Message, OnlineUser, Room } from './types.ts'
 import type { Theme } from './types.ts'
+
+type PresencePayload = {
+  client_id?: string
+  nickname?: string
+  online_at?: string
+}
 
 function sortRooms(rooms: Room[]) {
   return [...rooms].sort((left, right) => {
@@ -77,6 +83,37 @@ function resolveActiveRoom(rooms: Room[], preferredRoomId: string | null) {
   return rooms.find((room) => room.is_default) ?? rooms[0] ?? null
 }
 
+function deriveOnlineUsers(
+  state: Record<string, PresencePayload[]>,
+  currentClientId: string,
+) {
+  return Object.entries(state)
+    .map(([presenceKey, presences]) => {
+      const firstPresence = [...presences].sort((left, right) => {
+        const leftTime = left.online_at ? new Date(left.online_at).getTime() : 0
+        const rightTime = right.online_at ? new Date(right.online_at).getTime() : 0
+
+        return leftTime - rightTime
+      })[0]
+
+      return {
+        clientId: presenceKey,
+        nickname: firstPresence?.nickname?.trim() || 'Guest',
+        onlineAt: firstPresence?.online_at ?? '',
+        isCurrentUser: presenceKey === currentClientId,
+      } satisfies OnlineUser
+    })
+    .sort((left, right) => {
+      if (left.isCurrentUser !== right.isCurrentUser) {
+        return left.isCurrentUser ? -1 : 1
+      }
+
+      return left.nickname.localeCompare(right.nickname, undefined, {
+        sensitivity: 'base',
+      })
+    })
+}
+
 function App() {
   const [nicknameState, setNicknameState] = useState<string | null>(() => getNickname())
   const [clientId] = useState(() => getOrCreateClientId())
@@ -88,6 +125,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messageError, setMessageError] = useState<string | null>(null)
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
   const [sendingMessage, setSendingMessage] = useState(false)
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
@@ -180,6 +218,7 @@ function App() {
   useEffect(() => {
     if (!nicknameState || !activeRoomId) {
       setMessages([])
+      setOnlineUsers([])
       return
     }
 
@@ -189,9 +228,24 @@ function App() {
     setMessagesLoading(true)
     setMessageError(null)
     setMessages([])
+    setOnlineUsers([])
 
     roomChannel = supabase
-      .channel(`room:${activeRoomId}`)
+      .channel(`room:${activeRoomId}`, {
+        config: {
+          presence: {
+            enabled: true,
+            key: clientId,
+          },
+        },
+      })
+      .on('presence', { event: 'sync' }, () => {
+        if (!roomChannel || isCancelled) {
+          return
+        }
+
+        setOnlineUsers(deriveOnlineUsers(roomChannel.presenceState<PresencePayload>(), clientId))
+      })
       .on(
         'postgres_changes',
         {
@@ -206,7 +260,17 @@ function App() {
           setMessages((currentMessages) => mergeMessages(currentMessages, [nextMessage]))
         },
       )
-      .subscribe()
+      .subscribe(async (status) => {
+        if (status !== 'SUBSCRIBED' || !roomChannel) {
+          return
+        }
+
+        await roomChannel.track({
+          client_id: clientId,
+          nickname: nicknameState,
+          online_at: new Date().toISOString(),
+        })
+      })
 
     void fetchRecentMessages(activeRoomId)
       .then((fetchedMessages) => {
@@ -233,10 +297,11 @@ function App() {
       isCancelled = true
 
       if (roomChannel) {
+        void roomChannel.untrack()
         void supabase.removeChannel(roomChannel)
       }
     }
-  }, [activeRoomId, nicknameState])
+  }, [activeRoomId, clientId, nicknameState])
 
   function handleNicknameSubmit(nextNickname: string) {
     setNickname(nextNickname)
@@ -316,6 +381,7 @@ function App() {
 
         <main className="flex min-h-screen min-w-0 flex-1 flex-col">
           <ChatHeader
+            onlineUsers={onlineUsers}
             room={activeRoom}
             onOpenSidebar={() => setIsMobileSidebarOpen(true)}
             theme={theme}

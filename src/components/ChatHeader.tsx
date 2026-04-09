@@ -1,6 +1,8 @@
-import type { Room, Theme } from '../types.ts'
+import { OnlinePresence } from './OnlinePresence.tsx'
+import type { OnlineUser, Room, Theme } from '../types.ts'
 
 type ChatHeaderProps = {
+  onlineUsers: OnlineUser[]
   room: Room | null
   onOpenSidebar: () => void
   theme: Theme
@@ -8,6 +10,7 @@ type ChatHeaderProps = {
 }
 
 export function ChatHeader({
+  onlineUsers,
   room,
   onOpenSidebar,
   theme,
@@ -39,13 +42,17 @@ export function ChatHeader({
         </div>
       </div>
 
-      <button
-        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-        onClick={onToggleTheme}
-        type="button"
-      >
-        {theme === 'dark' ? 'Light' : 'Dark'}
-      </button>
+      <div className="flex items-center gap-2">
+        <OnlinePresence users={onlineUsers} />
+
+        <button
+          className="rounded-full border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+          onClick={onToggleTheme}
+          type="button"
+        >
+          {theme === 'dark' ? 'Light' : 'Dark'}
+        </button>
+      </div>
     </header>
   )
 }
