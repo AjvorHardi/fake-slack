@@ -24,6 +24,11 @@ export type OnlineUser = {
   isCurrentUser: boolean
 }
 
+export type TypingUser = {
+  clientId: string
+  nickname: string
+}
+
 export type CreateRoomInput = {
   name: string
   description: string | null

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { ChatHeader } from './components/ChatHeader.tsx'
 import { CreateRoomModal } from './components/CreateRoomModal.tsx'
@@ -6,6 +6,7 @@ import { MessageComposer } from './components/MessageComposer.tsx'
 import { MessageList } from './components/MessageList.tsx'
 import { NicknameGate } from './components/NicknameGate.tsx'
 import { Sidebar } from './components/Sidebar.tsx'
+import { TypingIndicator } from './components/TypingIndicator.tsx'
 import { createRoom, fetchRecentMessages, fetchRooms, insertMessage } from './lib/chat.ts'
 import { supabase } from './lib/supabase.ts'
 import {
@@ -17,13 +18,20 @@ import {
   setNickname,
   setTheme,
 } from './lib/storage.ts'
-import type { CreateRoomInput, Message, OnlineUser, Room } from './types.ts'
+import type { CreateRoomInput, Message, OnlineUser, Room, TypingUser } from './types.ts'
 import type { Theme } from './types.ts'
 
 type PresencePayload = {
   client_id?: string
   nickname?: string
   online_at?: string
+}
+
+type TypingPayload = {
+  client_id?: string
+  nickname?: string
+  is_typing?: boolean
+  sent_at?: string
 }
 
 function sortRooms(rooms: Room[]) {
@@ -114,6 +122,25 @@ function deriveOnlineUsers(
     })
 }
 
+function deriveTypingUsers(
+  typingState: Record<string, { nickname: string; expiresAt: number }>,
+  currentClientId: string,
+) {
+  return Object.entries(typingState)
+    .filter((entry) => entry[0] !== currentClientId)
+    .map(([typingClientId, value]) => {
+      return {
+        clientId: typingClientId,
+        nickname: value.nickname,
+      } satisfies TypingUser
+    })
+    .sort((left, right) =>
+      left.nickname.localeCompare(right.nickname, undefined, {
+        sensitivity: 'base',
+      }),
+    )
+}
+
 function App() {
   const [nicknameState, setNicknameState] = useState<string | null>(() => getNickname())
   const [clientId] = useState(() => getOrCreateClientId())
@@ -126,13 +153,21 @@ function App() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messageError, setMessageError] = useState<string | null>(null)
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
+  const [typingState, setTypingState] = useState<
+    Record<string, { nickname: string; expiresAt: number }>
+  >({})
   const [sendingMessage, setSendingMessage] = useState(false)
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const roomChannelRef = useRef<RealtimeChannel | null>(null)
 
   const activeRoom = useMemo(
     () => rooms.find((room) => room.id === activeRoomId) ?? null,
     [activeRoomId, rooms],
+  )
+  const typingUsers = useMemo(
+    () => deriveTypingUsers(typingState, clientId),
+    [clientId, typingState],
   )
 
   useEffect(() => {
@@ -219,6 +254,7 @@ function App() {
     if (!nicknameState || !activeRoomId) {
       setMessages([])
       setOnlineUsers([])
+      setTypingState({})
       return
     }
 
@@ -229,6 +265,7 @@ function App() {
     setMessageError(null)
     setMessages([])
     setOnlineUsers([])
+    setTypingState({})
 
     roomChannel = supabase
       .channel(`room:${activeRoomId}`, {
@@ -245,6 +282,36 @@ function App() {
         }
 
         setOnlineUsers(deriveOnlineUsers(roomChannel.presenceState<PresencePayload>(), clientId))
+      })
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const nextTyping = payload.payload as TypingPayload
+
+        if (!nextTyping.client_id || nextTyping.client_id === clientId) {
+          return
+        }
+
+        const typingClientId = nextTyping.client_id
+
+        if (!nextTyping.is_typing) {
+          setTypingState((currentState) => {
+            if (!currentState[typingClientId]) {
+              return currentState
+            }
+
+            const nextState = { ...currentState }
+            delete nextState[typingClientId]
+            return nextState
+          })
+          return
+        }
+
+        setTypingState((currentState) => ({
+          ...currentState,
+          [typingClientId]: {
+            nickname: nextTyping.nickname?.trim() || 'Guest',
+            expiresAt: Date.now() + 3000,
+          },
+        }))
       })
       .on(
         'postgres_changes',
@@ -271,6 +338,7 @@ function App() {
           online_at: new Date().toISOString(),
         })
       })
+    roomChannelRef.current = roomChannel
 
     void fetchRecentMessages(activeRoomId)
       .then((fetchedMessages) => {
@@ -300,8 +368,34 @@ function App() {
         void roomChannel.untrack()
         void supabase.removeChannel(roomChannel)
       }
+
+      if (roomChannelRef.current === roomChannel) {
+        roomChannelRef.current = null
+      }
     }
   }, [activeRoomId, clientId, nicknameState])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const now = Date.now()
+
+      setTypingState((currentState) => {
+        const nextEntries = Object.entries(currentState).filter(
+          ([, value]) => value.expiresAt > now,
+        )
+
+        if (nextEntries.length === Object.keys(currentState).length) {
+          return currentState
+        }
+
+        return Object.fromEntries(nextEntries)
+      })
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
 
   function handleNicknameSubmit(nextNickname: string) {
     setNickname(nextNickname)
@@ -351,6 +445,25 @@ function App() {
     } finally {
       setSendingMessage(false)
     }
+  }
+
+  async function sendTypingEvent(isTyping: boolean) {
+    const roomChannel = roomChannelRef.current
+
+    if (!roomChannel || !nicknameState) {
+      return
+    }
+
+    await roomChannel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        client_id: clientId,
+        nickname: nicknameState,
+        is_typing: isTyping,
+        sent_at: new Date().toISOString(),
+      },
+    })
   }
 
   if (!nicknameState) {
@@ -407,11 +520,20 @@ function App() {
             roomName={activeRoom?.name ?? 'Chat'}
           />
 
+          <TypingIndicator users={typingUsers} />
+
           <MessageComposer
+            key={activeRoom?.id ?? 'no-room'}
             disabled={!activeRoom}
             isSending={sendingMessage}
             maxLength={1000}
             onSend={handleSendMessage}
+            onTypingStart={() => {
+              void sendTypingEvent(true)
+            }}
+            onTypingStop={() => {
+              void sendTypingEvent(false)
+            }}
           />
         </main>
       </div>
