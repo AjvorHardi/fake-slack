@@ -480,7 +480,7 @@ function App() {
 
   return (
     <>
-      <div className="flex min-h-screen bg-[var(--app-bg)] text-[var(--text-primary)]">
+      <div className="flex h-dvh overflow-hidden bg-[var(--app-bg)] text-[var(--text-primary)]">
         <Sidebar
           activeRoomId={activeRoomId}
           isOpen={isMobileSidebarOpen}
@@ -492,7 +492,7 @@ function App() {
           roomsLoading={roomsLoading}
         />
 
-        <main className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <ChatHeader
             onlineUsers={onlineUsers}
             room={activeRoom}

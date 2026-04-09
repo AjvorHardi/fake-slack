@@ -21,6 +21,7 @@ export function MessageComposer({
   const [body, setBody] = useState('')
   const isTypingRef = useRef(false)
   const lastTypingPingAtRef = useRef(0)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const timeoutRef = useRef<number | null>(null)
 
   function clearTypingTimeout() {
@@ -83,6 +84,9 @@ export function MessageComposer({
 
     if (didSend) {
       setBody('')
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus()
+      })
     }
   }
 
@@ -112,6 +116,7 @@ export function MessageComposer({
         <label className="min-w-0 flex-1">
           <span className="sr-only">Message</span>
           <textarea
+            ref={textareaRef}
             className="max-h-40 min-h-[3.25rem] w-full resize-none rounded-3xl border border-[var(--border)] bg-[var(--panel-muted)] px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-70"
             disabled={disabled || isSending}
             maxLength={maxLength}

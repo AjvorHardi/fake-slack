@@ -33,7 +33,7 @@ export function Sidebar({
 
       <aside
         className={[
-          'fixed inset-y-0 left-0 z-40 flex w-[18.5rem] max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)] transition-transform md:static md:z-auto md:max-w-none md:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex h-dvh w-[18.5rem] max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)] transition-transform md:static md:z-auto md:max-w-none md:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
       >
