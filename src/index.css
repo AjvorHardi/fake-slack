@@ -1,1 +1,83 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --app-bg: #f4f7f3;
+  --app-bg-muted: #eef3ed;
+  --sidebar-bg: #f8fbf7;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-muted: rgba(249, 251, 248, 0.95);
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.18);
+  --text-primary: #16211c;
+  --text-secondary: #526258;
+  --text-muted: #748279;
+  --accent: #1f9d63;
+  --accent-strong: #197d4f;
+  --accent-soft: rgba(31, 157, 99, 0.12);
+  --danger: #c2410c;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --app-bg: #0d1411;
+  --app-bg-muted: #111a16;
+  --sidebar-bg: #0f1814;
+  --panel: rgba(20, 29, 25, 0.95);
+  --panel-muted: rgba(16, 24, 20, 0.98);
+  --border: rgba(148, 163, 184, 0.12);
+  --border-strong: rgba(148, 163, 184, 0.24);
+  --text-primary: #ecf4ef;
+  --text-secondary: #aac0b2;
+  --text-muted: #708278;
+  --accent: #2fbf79;
+  --accent-strong: #269962;
+  --accent-soft: rgba(47, 191, 121, 0.14);
+  --danger: #fb923c;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+textarea {
+  field-sizing: content;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.35);
+  background-clip: padding-box;
+}
