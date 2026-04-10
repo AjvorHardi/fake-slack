@@ -18,7 +18,16 @@ import {
   setNickname,
   setTheme,
 } from './lib/storage.ts'
-import type { CreateRoomInput, Message, OnlineUser, Room, TypingUser } from './types.ts'
+import type {
+  ChatItem,
+  ChatMessageItem,
+  ChatSystemEvent,
+  CreateRoomInput,
+  Message,
+  OnlineUser,
+  Room,
+  TypingUser,
+} from './types.ts'
 import type { Theme } from './types.ts'
 
 type PresencePayload = {
@@ -69,6 +78,19 @@ function sortMessages(messages: Message[]) {
   })
 }
 
+function sortChatItems(items: ChatItem[]) {
+  return [...items].sort((left, right) => {
+    const createdAtDiff =
+      new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+
+    if (createdAtDiff !== 0) {
+      return createdAtDiff
+    }
+
+    return left.id.localeCompare(right.id)
+  })
+}
+
 function mergeMessages(current: Message[], incoming: Message[]) {
   const messageMap = new Map(current.map((message) => [message.id, message]))
 
@@ -77,6 +99,16 @@ function mergeMessages(current: Message[], incoming: Message[]) {
   }
 
   return sortMessages([...messageMap.values()])
+}
+
+function mergeSystemEvents(current: ChatSystemEvent[], incoming: ChatSystemEvent[]) {
+  const eventMap = new Map(current.map((event) => [event.id, event]))
+
+  for (const event of incoming) {
+    eventMap.set(event.id, event)
+  }
+
+  return sortChatItems([...eventMap.values()]) as ChatSystemEvent[]
 }
 
 function resolveActiveRoom(rooms: Room[], preferredRoomId: string | null) {
@@ -152,6 +184,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messageError, setMessageError] = useState<string | null>(null)
+  const [systemEvents, setSystemEvents] = useState<ChatSystemEvent[]>([])
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
   const [typingState, setTypingState] = useState<
     Record<string, { nickname: string; expiresAt: number }>
@@ -169,6 +202,19 @@ function App() {
     () => deriveTypingUsers(typingState, clientId),
     [clientId, typingState],
   )
+  const chatItems = useMemo(() => {
+    const messageItems: ChatMessageItem[] = messages.map((message) => ({
+      kind: 'message',
+      id: message.id,
+      created_at: message.created_at,
+      message,
+    }))
+
+    return sortChatItems([
+      ...messageItems,
+      ...systemEvents,
+    ])
+  }, [messages, systemEvents])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -253,6 +299,7 @@ function App() {
   useEffect(() => {
     if (!nicknameState || !activeRoomId) {
       setMessages([])
+      setSystemEvents([])
       setOnlineUsers([])
       setTypingState({})
       return
@@ -264,6 +311,7 @@ function App() {
     setMessagesLoading(true)
     setMessageError(null)
     setMessages([])
+    setSystemEvents([])
     setOnlineUsers([])
     setTypingState({})
 
@@ -282,6 +330,44 @@ function App() {
         }
 
         setOnlineUsers(deriveOnlineUsers(roomChannel.presenceState<PresencePayload>(), clientId))
+      })
+      .on('presence', { event: 'join' }, (payload) => {
+        const joinedClientId = payload.key
+        const joinedPresence = payload.newPresences[0]
+
+        if (!joinedClientId || joinedClientId === clientId) {
+          return
+        }
+
+        setSystemEvents((currentEvents) =>
+          mergeSystemEvents(currentEvents, [
+            {
+              kind: 'system',
+              id: `join:${joinedClientId}:${Date.now()}`,
+              body: `${joinedPresence?.nickname?.trim() || 'Guest'} joined the room`,
+              created_at: new Date().toISOString(),
+            },
+          ]),
+        )
+      })
+      .on('presence', { event: 'leave' }, (payload) => {
+        const leftClientId = payload.key
+        const leftPresence = payload.leftPresences[0]
+
+        if (!leftClientId || leftClientId === clientId) {
+          return
+        }
+
+        setSystemEvents((currentEvents) =>
+          mergeSystemEvents(currentEvents, [
+            {
+              kind: 'system',
+              id: `leave:${leftClientId}:${Date.now()}`,
+              body: `${leftPresence?.nickname?.trim() || 'Guest'} left the room`,
+              created_at: new Date().toISOString(),
+            },
+          ]),
+        )
       })
       .on('broadcast', { event: 'typing' }, (payload) => {
         const nextTyping = payload.payload as TypingPayload
@@ -514,9 +600,9 @@ function App() {
           ) : null}
 
           <MessageList
+            items={chatItems}
             clientId={clientId}
             isLoading={messagesLoading}
-            messages={messages}
             roomName={activeRoom?.name ?? 'Chat'}
           />
 

@@ -17,6 +17,22 @@ export type Message = {
   created_at: string
 }
 
+export type ChatSystemEvent = {
+  kind: 'system'
+  id: string
+  body: string
+  created_at: string
+}
+
+export type ChatMessageItem = {
+  kind: 'message'
+  id: string
+  created_at: string
+  message: Message
+}
+
+export type ChatItem = ChatMessageItem | ChatSystemEvent
+
 export type OnlineUser = {
   clientId: string
   nickname: string
