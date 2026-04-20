@@ -42,7 +42,7 @@ export function Sidebar({
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-[var(--accent)]">
               Rooms
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">Fake-Slack</h2>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">Slack-alike</h2>
           </div>
 
           <button
