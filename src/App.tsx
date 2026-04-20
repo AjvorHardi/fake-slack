@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { Analytics } from '@vercel/analytics/react'
 import { ChatHeader } from './components/ChatHeader.tsx'
 import { CreateRoomModal } from './components/CreateRoomModal.tsx'
 import { MessageComposer } from './components/MessageComposer.tsx'
@@ -632,6 +633,8 @@ function App() {
           onSubmit={handleCreateRoom}
         />
       ) : null}
+
+      <Analytics />
     </>
   )
 }
