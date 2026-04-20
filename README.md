@@ -1,73 +1,119 @@
-# React + TypeScript + Vite
+# Fake-Slack
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Guest multi-room chat built with React, Vite, TypeScript, Tailwind, and Supabase Realtime.
 
-Currently, two official plugins are available:
+## What It Does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Join with a nickname, no account required
+- Browse and switch rooms
+- Create new rooms
+- Send messages with latest-20 history loading
+- See online presence per room
+- See typing indicators
+- See join/leave room events
 
-## React Compiler
+## Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19
+- Vite
+- TypeScript
+- Tailwind CSS
+- Supabase (`rooms`, `messages`, Realtime, RLS)
+- Vercel for hosting
 
-## Expanding the ESLint configuration
+## Local Setup
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Install dependencies:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+   ```bash
+   npm install
+   ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+2. Create a local env file:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+   ```bash
+   cp .env.example .env.local
+   ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+3. Set the required variables in `.env.local`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+   ```env
+   VITE_SUPABASE_URL=...
+   VITE_SUPABASE_ANON_KEY=...
+   ```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+4. Start the app:
+
+   ```bash
+   npm run dev
+   ```
+
+## Supabase Setup
+
+This app expects a Supabase project with:
+
+- a `rooms` table
+- a `messages` table
+- Row Level Security enabled
+- public `select` and `insert` access for `anon`
+- `rooms` and `messages` added to the `supabase_realtime` publication
+- at least one default room with `is_default = true`
+
+The repo includes an idempotent bootstrap script:
+
+- [supabase/001_bootstrap.sql](supabase/001_bootstrap.sql)
+
+Run it once in the Supabase SQL Editor for the target project.
+
+## Environment Variables
+
+Required in both local development and Vercel:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+These are public browser variables and are expected to be exposed to the client. Do not use the Supabase service role key in this app.
+
+## Scripts
+
+- `npm run dev`: start local Vite dev server
+- `npm run build`: type-check and build production assets
+- `npm run lint`: run ESLint
+- `npm run preview`: serve the built app locally
+
+## Deploy To Vercel
+
+Recommended flow:
+
+1. Push the repo to GitHub.
+2. In Vercel, import the repository as a new project.
+3. Let Vercel auto-detect the Vite framework settings.
+4. Add these environment variables in Vercel for `Production`:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+5. Add the same variables for `Preview`.
+6. Deploy `main` to get the production `vercel.app` URL.
+
+For this MVP, using the same Supabase project for both `Production` and `Preview` is acceptable. The tradeoff is that preview deployments write to the same database as production.
+
+## Manual Verification
+
+Run these checks locally and again on the Vercel deployment:
+
+- open the app and enter a nickname
+- verify nickname persists after refresh
+- verify the default room loads when no room is stored
+- create a room and switch into it
+- send a message and confirm it appears immediately
+- refresh and confirm the latest 20 messages load
+- open a second browser session and verify:
+  - realtime message delivery
+  - online presence
+  - typing indicator
+  - join/leave system events
+
+## Notes
+
+- The app uses the Supabase `anon` key from the browser.
+- No authentication flow is implemented in phase 1.
+- This repo currently has no automated tests; validation is lint, build, and manual multi-session verification.
