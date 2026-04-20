@@ -51,7 +51,7 @@ export function NicknameGate({
 
       <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-8 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
         <p className="text-sm font-medium uppercase tracking-[0.28em] text-[var(--accent)]">
-          Fake-Slack
+          Slack-alike
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">Join the conversation</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
